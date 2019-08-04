@@ -1,0 +1,114 @@
+---
+title: "nightlights"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(raster)
+library(spatstat)
+library(rgdal)
+library(rgeos)
+library(sf)
+library(ggplot2)
+library(ggmap)
+library(dplyr)
+library(maptools)
+library(proj4)
+library(ggrepel)
+library(ggspatial)
+library(sp)
+library(dplyr)
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(RColorBrewer)
+library(classInt)
+library(maps)
+library(gdistance)
+library(distances)
+library(geosphere)
+library(spdplyr)
+
+?gDistance
+gDistance
+
+summary(roads_WGS84)
+```
+
+
+Load the files:
+```{r cars}
+env_state<-readOGR(dsn="c:/users/Andre/Downloads/env_stat.sqlite", layer="env_stat")
+
+
+nightlight.r
+
+hist(nightlight.r, main="Distribution of elevation values", 
+     col= "purple", 
+     maxpixels=10000000)
+
+nightlight_csv<-as(nightlight, "sf")
+summary(nightlight)
+r.raster<-raster()
+
+night_light.r<-rasterize(nightlight, r.raster)
+
+plot(night_light.r, xlim=c(-150,-130))
+
+new_data<-nightlight_csv%>%group_by(fid_2)%>%summarize(val=mean(value), pop=mean(pop2010))
+
+plot(density(new_data$val))
+
+
+plot(nightlight)
+
+
+
+mean(y$pop2010)
+range(y$value)
+
+
+
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+
+
+
+env_state<-env_state%>%distinct(id, .keep_all = TRUE)
+env_state2<-env_state2 %>%select(-c("geometry" ))
+
+env_state2<-na.omit(as(env_state,"sf"))
+
+tract_comb<-tract_comb%>%select(-c("populati_1" ))
+gg<-ggplot() + 
+  geom_polygon(aes(long,lat,group=group), data=env_sf) +
+  scale_fill_gradient(env_sf$pop2010)
+  geom_path(aes(long,lat,group=group), color="white", data=env_sf)
+  
+gg
+  
+  
+envsp<-as(env_sf, "SpatialPolygonsDataFrame")
+
+shapes <- merge(envsp, tract_comb, by.x = "tract", by.y = "tract")
+
+plot(log(env_sf$pop_dens), env_sf$light_mean)
+
+fit<-lm(env_state$pop_quantile~env_state$light_quantile)
+summary(fit)
+
+
+ggplot() + 
+  geom_polygon(aes(long,lat,group=group), data=env_sf, fill="pop2010",  color="white") +scale_fill_gradient(low="gray99", high="firebrick1", name="Distribution")
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

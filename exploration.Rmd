@@ -1,0 +1,203 @@
+---
+title: "Exploration"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+install.packages('raster')
+library(raster)
+
+install.packages('spatstat')
+library(spatstat)
+
+install.packages('rgdal')
+library(rgdal)
+
+install.packages('rgeos')
+library(rgeos)
+
+install.packages('sf')
+library(sf)
+
+install.packages('ggplot2')
+library(ggplot2)
+
+install.packages('ggmap')
+library(ggmap)
+
+install.packages('dplyr')
+library(dplyr)
+
+install.packages('maptools')
+library(maptools)
+
+install.packages('proj4')
+library(proj4)
+
+install.packages('sp')
+library(sp)
+
+install.packages("ggrepel")
+library(ggrepel)
+
+install.packages("dplyr")
+library(dplyr)
+
+install.packages("data.table")
+library(data.table)
+
+install.packages("tidyverse")
+library(tidyverse)
+
+install.packages("lubridate")
+library(lubridate)
+
+
+library(RColorBrewer)
+library(classInt)
+
+install.packages('maps')
+library(maps)
+
+```
+
+
+
+```{r cars}
+CRS(tul_sjv)
+tul_sjv_WGS84 <- spTransform(tul_sjv,
+                                CRS(("+proj=robin +datum=WGS84")))
+
+tul_roads_WGS84 <- spTransform(tul_roads,
+                                CRS(("+proj=robin +datum=WGS84")))
+
+d <- gDistance(tul_sjv_WGS84, tul_roads_WGS84, byid=TRUE)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+file.exists('c:/users/Andre/Downloads/Tulare/tulag.sqlite')
+
+#Tulare agricultural data
+tul_ag<-readOGR(dsn="c:/users/Andre/Downloads/Tulare/tulag.sqlite", layer="tulag")
+
+#Tular road data
+tul_roads<-readOGR(dsn="c:/users/Andre/Downloads/Tulare/tul_roads2.sqlite", layer="tul_roads2")
+
+tul_env<-readOGR(dsn="c:/users/Andre/Downloads/Tulare/tulenv.sqlite", layer="tulenv")
+
+tul_traffic<-readOGR(dsn="c:/users/Andre/Downloads/Tulare/tul_traffic.sqlite", layer="tul_traffic")
+
+tul_sjv<-readOGR(dsn="c:/users/Andre/Downloads/Tulare/tulsjv2.sqlite", layer="tulsjv2")
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+tul<-as(tul_sjv_WGS84,'sf')
+
+ggplot(tul_env) + 
+  aes(long,lat,group=group) + 
+  geom_polygon() +
+  geom_path(color="white") +
+  geom_point(data = tul, aes(x = longitude, y = latitude),col="red", size=5)
+  
+
+ggplot( aes(long,lat,group=group) ,data=tul_env)+geom_polygon()+geom_point(aes(x = longitude, y = latitude),data=tul,col="red", size=5)
+  
+  #stat_density_2d(aes(longitude, latitude, colour=population, data=tul), geom = "polygon", colour="white")
+
+
+
+
+plot(tul_env, xlim = c(-118, -120), ylim = c(35, 37), asp = 1)+plot(tul_ag)
+
+plot(tul_env, col='light gray', border='gray')
+plot(tul_ag, add=TRUE, density=20, lwd=2, col='red')
+plot(tul_roads, add=TRUE, density=20, lwd=2, col='red')
+plot(tul_traffic, add=TRUE, density=20, lwd=2, col='blue')
+plot(tul_sjv, add=TRUE, density=20, lwd=2, col='green')
+
+d <- density(tul$population)
+
+ggplot() + 
+  geom_polygon(aes(long,lat,group=group), data=tul_env, fill="lightsteelblue3", color="dark gray" ) +
+  geom_path(aes(long,lat,group=group), color="white", data=tul_env) +
+  geom_point(aes(x = longitude, y = latitude, size=population), data = tul, col="black")
+
+
+gg<-ggplot() + 
+  geom_polygon(aes(long,lat,group=group), data=tul_env, fill="lightsteelblue3", color="dark gray" ) +
+  geom_path(aes(long,lat,group=group), color="white", data=tul_env)
+
+gg+stat_density2d(data=tul, show.legend=F, aes(x=longitude, y=latitude, fill=..level.., alpha=..level..), geom="polygon", size=2, bins=15)+ scale_fill_gradient(low="gray99", high="firebrick1", name="Distribution")
+
+tul_traf<-as(tul_traffic, "sf")
+
+gg+###stat_density2d(data=tul, show.legend=F, aes(x=longitude, y=latitude,fill = stat(nlevel), fill=..level.., alpha=..level..), geom="polygon", size=2, bins=15)+
+  #scale_fill_viridis_c()+
+  geom_point(aes(x = longitude, y = latitude, size=ahead.peak.hour), data = tul_traf, col="black", alpha=0.1)+
+  geom_point(aes(x = longitude, y = latitude, size=population), data = tul, col="red", alpha=0.1)
+
+
+```
+
+
+```{r}
+s  <- readOGR(".","starbucks")  # Don't add the .shp extension
+starbuckssf<- as(tul_traffic, "sf")
+
+starbucks<- as(tul_traffic, "ppp")
+
+Q <- quadratcount(starbucks$aadt, nx= 6, ny=3)
+plot(starbucks, pch=20, cols="grey70", main=NULL)  # Plot points
+plot(Q, add=TRUE)
+
+ma    <- as(tul_env, "owin") 
+
+Window(starbucks)<-ma
+
+plot(starbucks, main=NULL, cols=rgb(0,0,0,.2), pch=20)
+
+qi<-intensity(Q)
+
+plot(ma, col='light gray', border='gray')
+plot(s$ahead.aadt, add=TRUE)
+plot(density(Q, image=TRUE), add=TRUE, las=1)
+
+mean(nndist(starbucks, k=1))
+
+s<-marks.ppp(starbucks)
+
+plot(tul_roads, add=TRUE, density=20, lwd=2, col='red')
+plot(tul_traffic, add=TRUE, density=20, lwd=2, col='blue')
+plot(tul_sjv, add=TRUE, density=20, lwd=2, col='green')
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

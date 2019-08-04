@@ -1,0 +1,247 @@
+---
+title: "mcda"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(raster)
+library(spatstat)
+library(rgdal)
+library(rgeos)
+library(sf)
+library(ggplot2)
+library(ggmap)
+library(dplyr)
+library(maptools)
+library(proj4)
+library(ggrepel)
+library(ggspatial)
+library(sp)
+library(dplyr)
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(RColorBrewer)
+library(classInt)
+library(maps)
+library(gdistance)
+library(distances)
+library(geosphere)
+library(spdplyr)
+shapes_sf<-as(shapes, "sf")
+summary(as.numeric(shapes_sf$trans_distance))
+plot(shapes)
+
+cal_urb5<-cal_urb2%>%distinct(fid, .keep_all=TRUE)%>%group_by(tract)%>%summarise(urb_area = sum(acres))
+
+
+
+tract_comb<-tract_comb%>%mutate(ag_prop = ag_area/shape_area, urb_prop = urb_area/shape_area)
+
+summary(tract_comb$urb_prop)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+tract_comb6<-as.data.table(tract_comb)
+
+tract_comb6[,gas_score:=ifelse(tract_comb6$gas_distance<5, 5, ifelse(5<tract_comb6$gas_distance&tract_comb6$gas_distance<10,4, ifelse(10<tract_comb6$gas_distance&tract_comb6$gas_distance<15, 3, ifelse(15<tract_comb6$gas_distance&tract_comb6$gas_distance<20 , 2, ifelse(20<tract_comb6$gas_distance, 1 ,  0)))))]
+
+tract_comb6[,road_score:=ifelse(tract_comb6$road_dist<5, 5, ifelse(5<tract_comb6$road_dist&tract_comb6$road_dist<10,4, ifelse(10<tract_comb6$road_dist&tract_comb6$road_dist<15, 3, ifelse(15<tract_comb6$road_dist&tract_comb6$road_dist<20 , 2, ifelse(20<tract_comb6$road_dist, 1 ,  0)))))]
+
+tract_comb6[,trans_score:=ifelse(tract_comb6$trans_dist<5, 5, ifelse(5<tract_comb6$trans_dist&tract_comb6$trans_dist<10,4, ifelse(10<tract_comb6$trans_dist&tract_comb6$trans_dist<15, 3, ifelse(15<tract_comb6$trans_dist&tract_comb6$trans_dist<20 , 2, ifelse(20<tract_comb6$trans_dist, 1 ,  0)))))]
+          
+                                              
+tract_comb6<-as.data.frame(tract_comb6)
+
+tract_comb6<-tract_comb6%>%mutate(light_quantile = ntile(lig_mean/shape_area, 10), pop_quantile = ntile(as.numeric(pop2010)/shape_area,5))
+
+
+                                                                                                                                                                                                
+
+
+
+                                                                 
+                                                                                
+
+score<-tract_comb6%>%mutate(score =                      gas_score+trans_score+road_score+light_quantile+pop_quantile )
+
+summary(score$score)
+
+summary(tract_comb6$Range)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+ca_base <- ggplot(data = env_state, mapping = aes(x = long, y = lat, group = group)) + 
+  coord_fixed(1.3) + 
+  geom_polygon(color = "black", fill = "gray")
+
+ca_base + theme_nothing() + 
+  geom_polygon(data = env_state, fill = NA, color = "white") 
+
+elbow_room1 <- ca_base + geom_polygon(data = env, aes(fill = edu), color = "white") +geom_polygon(color = "black", fill = NA) +theme_bw() 
+
+elbow_room1
+
+
+
+writeOGR(env_state, dsn="c:/users/Andre/Downloads/env_new.sqlite", layer="env_state",  driver = "SQLite", dataset_options = NULL,
+ layer_options=NULL, verbose = FALSE, check_exists=NULL,
+ overwrite_layer=FALSE, delete_dsn=FALSE, morphToESRI=NULL,
+ encoding=NULL)
+
+fit<-lm()
+
+
+ggplot(as.data.frame(env_state), aes(x = pop_dens, y =light_dens))+geom_point()+xlab("Population density (people/m^2)") + ylab("Light Density (value/m^2)")
+
+
+
+install.packages("DataExplorer")
+library(DataExplorer)
+
+
+
+
+
+
+
+
+
+
+k1<-tract_comb$ciscore
+
+k1 <-as.data.frame(k1)
+
+k2<-k1%>%mutate(gas_dist = tract_comb$gas_distance, road_dist = tract_comb$road_distance, trans_dist = tract_comb$trans_distance, ling=tract_comb$ling, light_quant = tract_comb6$light_quantile, pop_quant = tract_comb6$pop_quantile, pov = tract_comb$pov, unemp = tract_comb$unemp)
+
+tract_comb6<-tract_comb6%>%mutate(gas_distance = tract_comb$gas_dist, road_distance = tract_comb$road_dist)
+
+install.packages("mice")
+library(mice)
+
+plot_missing(k2)
+
+k7<-mice(k2, method = "mean")
+k6<-complete(k7)
+plot_missing(k6)
+
+OGR
+env_sf2
+clusters<-kmeans(k6, centers=7, nstart=3)
+summary(clusters)
+
+k5<-tract_comb6%>%mutate(cluster = clusters$cluster)
+clusters
+set.seed(20)
+
+
+
+ggplot()+geom_point(aes(x=init_popfit3$predicted, y= tract_comb3$pop_dens))+xlab("Population Density")+ylab("Predicted Population Density")
+
+
+
+
+```
+
+
+```{r}
+###SCORES
+
+road   = 30
+trans  = 10
+night  = 150
+gas    = 10
+pop    = 150
+ci     = 20
+po     = 20
+un     = 20
+li     = 10
+
+sum = road + trans + night + gas + pop + ci + pov + unemp + ling
+
+
+road_w   = road/sum
+trans_w  = trans/sum
+night_w  = night/sum
+gas_w    = gas/sum
+pop_w    = pop/sum
+ci_w     = ci/sum
+pov_w    = pov/sum
+unemp_w  = unemp/sum
+ling_w   = ling/sum
+
+
+tract_comb6<-tract_comb6%>%mutate(light_quantile = ntile(lig_mean/shape_area, 10),pop_dens = as.numeric(pop2010)/shape_area*1000000, pop_quantile = ntile(pop_dens, 10))
+
+tract_comb6$cl
+  
+  
+tract_comb7<-env4%>%mutate(light_quantile = ntile(tract_comb6$lig_mean/tract_comb6$shape_area, 10),pop_dens = as.numeric(tract_comb6$pop2010)/tract_comb6$shape_area*1000000, pop_quantile = ntile(pop_dens, 10), + env4$ling*ling_w, cluster=clusters$cluster, smart2 = env4$road_dist*road_w+ env4$trans_distance*trans_w+          env4$light_quantile*night_w+ env4$pop_quantile*pop_w + env4$ciscore*ci_w + env4$pov*pov_w+ env4$unemp*unemp_w + env4$ling*ling_w)
+
+env4 <- subset(tract_comb6, select = c("light_quantile", "pov", "drink", "swis", "pollution", "pm", "ozone", "gwthreats", "road_distance","trans_distance","gas_distance","white_pct", "haz","iwb","asthma","lbw","other_pct","asian_amer","native_ame","african_am","hispanic_p","elderly_ov","pop_11_64_","children_u","popcharsco","housingb","unemp","ling","edu","cvd", "pop_quantile", "ciscore"))
+
+plot_missing(tract_comb7)
+env5<-mice(tract_comb7, method = "mean")
+env7<-complete(env5)
+plot_missing(env7)
+
+summary(env4$pop_quantile)
+
+
+
+env7<-env7%>%mutate(smart = env7$road_dist*road_w+ env7$trans_distance*trans_w+          env7$light_quantile*night_w+ env7$pop_quantile*pop_w + env7$ciscore*ci_w + env7$pov*pov_w+ env7$unemp*unemp_w + env7$ling*ling_w, smart_q = ntile(env7$smart,7 ))
+
+env4
+
+                           
+                           
+                           , smart_q = ntile(tract_comb7$smart2, 7)) 
+
+plot_missing(tract_comb7)
+
+summary(tract_comb6$smart)                             
+                                  
+                                  
+plot(tract_comb6$smart_q, tract_comb6$cluster)
+
+
+env_sf<-as(env, "sf")
+
+env_sf<-env%>%distinct(by = "id")
+
+%>%mutate(cluster_q = env7$cluster_q, smart_q = env7$smart_q)
+
+
+env_sf2 <- as(env_sf2, "Spatial")
+
+env<-readOGR(dsn="c:/users/Andre/Downloads/env.sqlite", layer="env")
+
+env_2<-env%>%distinct(id,.keep_all = TRUE)
+
+env_2<-env_2%>%mutate(cluster=env7$cluster, smart_q = env7$smart_q)
+
+
+writeOGR(obj=env_2, dsn="c:/users/Andre/Downloads/env_2.sqlite", layer="env_2", driver="SQLite")
+
+
+
+```
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,235 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(randomForest)
+library(randomForest)
+library(raster)
+library(spatstat)
+library(rgdal)
+library(rgeos)
+library(sf)
+library(ggplot2)
+library(ggmap)
+library(dplyr)
+library(maptools)
+library(proj4)
+library(ggrepel)
+library(sp)
+library(dplyr)
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(RColorBrewer)
+library(classInt)
+library(maps)
+library(gdistance)
+library(distances)
+library(geosphere)
+
+
+tract_comb7<-tract_comb6%>%select(-c("ogc_fid1", "ogc_fid0","fid", "objectid","ces_3_0_pe","ciscorep", "ozonep","pmp","dieselp","drinkp","pestp","rseihazp","trafficp","cleanupsp","gwthreatsp","hazp","iwbp","swisp","pollutionp","asthmap","lbwp","cvdp","edup","lingp","povp","unempp","housingbp","popcharp","objectid_1","X_count","X_sum","X_mean","fr_gcount","fr_gmean","fr_gsum","geometry.x","geometry.y","population" , "populati_1"))
+
+library(mice)
+tract_comb3<-na.omit(tract_comb7)
+
+plot_missing(tract_comb7)
+tract_comb8<-mice(tract_comb7, method = "mean")
+k5<-complete(k4)
+plot_missing(k5)
+
+tract_comb3<-tract_comb3%>%mutate(light_dens = lig_mean/shape_area, light_quantile = ntile(light_dens, 10), pop_dens = as.numeric(pop2010)/shape_area*1000000, populati_1=0, population = 0, pop_quantile = ntile(pop_dens, 10), pov=as.numeric(pov), ag_dens = ag_area/shape_area)
+
+
+
+
+
+env4 <- subset(tract_comb3, select = c("light_quantile", "pov", "drink", "swis", "pollution", "pm", "ozone", "gwthreats", "road_distance","trans_distance","white_pct", "ag_dens", "gas_distance", "haz","iwb","asthma","lbw","other_pct","asian_amer","native_ame","african_am","hispanic_p","elderly_ov","pop_11_64_","children_u","popcharsco","housingb","unemp","ling","edu","cvd"))
+
+
+env.df<-as.data.frame(env4)
+env.vec<-as.vector(tract_comb3$pop_dens)
+
+
+
+set.seed(2014)
+
+```
+
+
+
+
+```{r pressure, echo=FALSE}
+require(randomForest)
+
+
+##########
+##  Random Forest regression of population density:
+set.seed(2394)
+x_dat <- env.df
+y_dat <- env.vec
+##  Now we are going tune our randomForest population density regression: 
+
+init_popfit3 = tuneRF(
+  x=x_dat, y=y_dat, plot=TRUE, mtryStart=length(x_dat)/3,
+  ntreeTry=length(y_dat)/20, improve=0.0001, stepFactor=1.20, trace=TRUE,
+  doBest=TRUE, nodesize=length(y_dat)/1000, na.action=na.omit, 
+  importance=TRUE, proximity=TRUE, sampsize=length(y_dat), replace=TRUE
+) 
+
+
+
+
+
+init_popfit = tuneRF(
+  x=x_dat, y=y_dat, plot=TRUE, mtryStart=length(x_dat)/3, 
+  ntreeTry=length(y_dat)/20, improve=0.0001, stepFactor=1.20, trace=TRUE,
+  doBest=TRUE, nodesize=length(y_dat)/1000, na.action=na.omit, 
+  importance=TRUE, proximity=TRUE, sampsize=length(y_dat), replace=TRUE
+) 
+##  Optimize the model by iteratively removing any 
+##    covariates with negative increases in node purity:
+
+##  Get list of covariates that have an importance score greater than 0:
+
+importance_scores3<-importance(init_popfit3)[order(importance(init_popfit3)[,1], decreasing=TRUE)]
+
+pos_importance2<-rownames(importance_scores3)[importance_scores3[],1] > 0
+
+while (length(pos_importance) <length(importance_scores[,1])) {
+  
+  ## Subset the x_data to just those columns having positive scores:
+  x_dat <- x_dat[pos_importance]
+
+popfit3 = tuneRF(x=x_dat, y=y_dat, plot=TRUE, mtryStart=length(x_dat)/3, 
+    ntreeTry=length(y_dat)/20, improve=0.0001, stepFactor=1.20, trace=TRUE, 
+    doBest=TRUE, nodesize=length(y_dat)/1000, na.action=na.omit, 
+    importance=TRUE, proximity=TRUE, sampsize=length(y_dat), replace=TRUE
+  ) 
+  
+  ## Re-check importance scores:
+importance_scores<-importance(init_popfit3)[order(importance(init_popfit3)[,1], decreasing=TRUE),]
+
+
+pos_importance <- rownames(importance_scores)[importance_scores[,1] > 0]
+  print(popfit)
+
+}
+
+
+##  Save off the popfit object for this set of data and potentially use
+##    for other countries with the same available covariates:
+save(popfit, file=paste(output_path_tmp, "popfit.RData", sep=""))
+
+env3<-env3%>%mutate(predict_pop = p*shape_area)
+
+plot(env3$pop_area, env$predict_pop)
+sum(env3$predict_pop)
+sum(env3$pop2010)
+
+
+p<-init_popfit[["predicted"]]
+
+plot(env3$pop2010,env3$predict_pop)
+
+sum(env3$pop2010)
+sum(env3$predict_pop)
+
+
+env<-env3[!duplicated(env3$tract), ]
+
+
+env<-env%>%mutate(round_light = round(fr_gmean))
+
+light_predicted<-env5%>%mutate(pred_pop_dens = p,pop_dens=env$pop_area, predicted_pop = p*env$shape_area, pop=env$pop2010, norm_pred_pop = h.x(env$round_light)*env$shape_area)
+
+pred_pop_light_dens <- init_popfit[["predicted"]]
+
+
+light_dens<-env5%>%mutate(pred_pop_dens = pred_pop_light_dens, light_area, pred_pop = pred_pop_light_dens*env$shape_area, actual_pop = env$pop2010, light_round = round(light_area*env$shape_area)  )
+
+
+
+plot(light_dens)
+
+plot(light_dens$light_round,light_dens$pred_pop_dens)
+
+sum(light_dens$actual_pop)
+sum(light_dens$pred_pop)
+
+
+fit <- lm(light_predicted$round_light ~ + light_predicted$pred_pop_dens + I(light_predicted$pred_pop_dens^2))
+
+
+fit2<-lm(light_dens$pred_pop_dens~light_dens$light_area)
+
+
+
+summary(fit2)
+
+
+
+
+
+
+
+sum(light_predicted$norm_pred_pop)
+max(light_predicted$pred_pop_dens)
+
+
+
+pred_light_values <- light_dens %>% group_by(light_round)%>%summarize(pop_dens = mean(pred_pop_dens))
+
+plot(pred_light_values)
+ 
+
+
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+
+```{r}
+#SPLIT THE ENV DATA INTO LIGHT QUANTILES AND POP QUANTILES
+
+env<-env%>%mutate(light_quantile = ntile(light_area, 10))
+env<-env%>%mutate(pop_quantile = ntile(pop_area, 10))
+
+plot(env$pop_quantile, env$light_quantile)
+fit<-lm(env$pop_quantile~env$light_quantile)
+summary(fit)
+
+plot(env$pop_area, env$light_area)
+fit<-lm(env$pop_area~env$light_area)
+summary(fit)
+
+env0<-as(env, "Spatial")
+
+```
+
+
+
+#JUST NIGHTLIGHTS
+```{r}
+
+plot(tract_comb3$light_dens, tract_comb3$pop_dens)
+
+fit<-lm(pop_dens~light_dens, data=tract_comb3)
+summary(fit)
+
+fun<-function(x){5.648e+02+4.843e+06*x}
+library(spdplyr)
+tract_comb3<-tract_comb3%>%mutate(pred_pop = fun(light_dens))
+
+tract_comb_p<-as(tract_comb, "Spatial")
+```
+
+
+
+ 
