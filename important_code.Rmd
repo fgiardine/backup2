@@ -1,0 +1,468 @@
+---
+title: "Exploration"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+library(raster)
+library(spatstat)
+library(rgdal)
+library(rgeos)
+library(sf)
+library(ggplot2)
+library(ggmap)
+library(dplyr)
+library(maptools)
+library(proj4)
+library(ggrepel)
+library(sp)
+library(dplyr)
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(RColorBrewer)
+library(classInt)
+library(maps)
+library(gdistance)
+library(distances)
+library(geosphere)
+library(spdplyr)
+```
+
+
+
+```{r cars}
+CRS(tul_sjv)
+gas_WGS84 <- spTransform(gas_lines,
+                                CRS(("+proj=robin +datum=WGS84")))
+
+tul_roads_WGS84 <- spTransform(tul_roads,
+                                CRS(("+proj=robin +datum=WGS84")))
+
+
+```
+
+
+```{r}
+#this file contains all of the tract centroids
+tract_cent<-readOGR(dsn="c:/users/Andre/Downloads/tract_centroid.sqlite", layer="tract_centroid")
+
+#transmission lines
+trans_lines<-readOGR(dsn="c:/users/Andre/Downloads/trans_lines.sqlite", layer="trans_lines")
+
+#agriculture
+agr<-readOGR(dsn="c:/users/Andre/Downloads/cal_ag.sqlite", layer="cal_ag")
+
+agr_sf<-as(agr, "sf")
+
+#summarizing acres of agriculture
+agr_sf2<-agr_sf%>%group_by(tract)%>%summarize(area = sum(acres))
+
+#adding agricultural area to the environmental data
+env%>%full_join(agr_sf2,by=c("tract"))
+
+
+
+#gaslines
+gas_lines<-readOGR(dsn="c:/users/Andre/Downloads/gaslines.sqlite", layer="gaslines")
+
+#projecting gaslines
+gas_WGS842 <- spTransform(gas_lines,
+                                CRS(("+proj=robin +datum=WGS84")))
+
+#NAD 83 projection for gaslines
+gas_NAD83 <- spTransform(gas_lines,
+                                CRS(("+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")))
+
+#agriculture layer
+cal_ag<-readOGR(dsn="c:/users/Andre/Downloads/cal_ag.sqlite", layer="cal_ag")
+
+cal_urb<-readOGR(dsn="c:/users/Andre/Downloads/urban_tracts.sqlite", layer="urban_tracts")
+
+cal_ag2<-as(cal_ag, "sf")
+
+cal_urb2<-as(cal_urb,"sf")
+
+cal_urb3<-cal_urb2%>%group_by(tract)%>%summarize(urb_area = sum(area()))
+
+cal_urb4<- as.data.frame(cal_urb3)
+
+cal_ag4<-as.data.frame(cal_ag3)
+cal_ag3<-cal_ag2%>%group_by(tract)%>%summarize(ag_area = sum(shape_area))
+
+
+merged<-cal_ag4%>%full_join(cal_urb4, by=c("tract"))%>%mutate(ag_area = replace(ag_area, is.na(ag_area), 0), urb_area=replace(urb_area, is.na(urb_area),0))
+
+merged2<-merged%>%full_join(env_sf, by=c("tract"))
+
+env_sf2<-merged%>%full_join(as.data.frame(env_sf2), by = c("tract"))
+
+
+
+
+
+
+
+
+
+
+tract_WGS84 <- spTransform(tract_cent,
+              CRS(("+proj=robin+datum=WGS84")))
+
+trans_WGS84 <- spTransform(trans_lines,
+              CRS(("+proj=robin+datum=WGS84")))
+
+gas_WGS84 <- spTransform(gas_lines,
+              CRS(("+proj=robin+datum=WGS84")))
+
+tract_NAD83 <- spTransform(tract_cent,
+                                CRS(("+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")))
+
+
+ca_roads<-readOGR(dsn="c:/users/Andre/Downloads/ca_roads.sqlite", layer="ca_roads")
+
+roads_NAD83 <- spTransform(ca_roads,
+                                CRS(("+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")))
+
+trans_NAD83 <- spTransform(trans_lines,
+                                CRS(("+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")))
+
+
+roads_WGS84 <-spTransform(ca_roads,CRS(("+proj=robin +datum=WGS84")))
+
+
+#EUCLIDEAN DISTANCE CALCULATIONS
+d <- gDistance(roads_WGS84, tract_WGS84, byid=TRUE)
+
+d2 <- gDistance(trans_WGS84, tract_WGS84, byid=TRUE)
+
+d3 <- gDistance(gas_WGS84, tract_WGS84, byid=TRUE)
+
+p3 <- gDistance(gas_NAD83,tract_NAD83,  byid=TRUE)
+
+p2 <- gDistance(trans_NAD83,tract_NAD83,  byid=TRUE)
+
+p1 <- gDistance(roads_NAD83,tract_NAD83,  byid=TRUE)
+
+#UPDATING DATASET WITH DISTANCES INCLUDED
+tracts<-as.data.frame(tract_cent) %>%mutate(gas_distance = apply(p3, 1, FUN=min)/1000, trans_dist = apply(p2, 1, FUN=min)/1000, road_dist = apply(p1, 1, FUN=min)/1000)
+
+#MAKE NEW COMPLETE DATASET
+tract_comb<-as.data.frame(tracts)%>%distinct(id,.keep_all = TRUE)%>%full_join(merged, by = c("tract"))
+
+write.csv(tract_comb, file = "c:/users/Andre/Downloads/tract_comb.csv")
+
+
+tract_comp <-tract_comp%>%subset(tract_comp, select=which(!duplicated(names(.)))) 
+
+View(agriculture)
+```
+
+
+
+
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+file.exists('c:/users/Andre/Downloads/Tulare/tulag.sqlite')
+
+
+env_sf<-readOGR(dsn="c:/users/Andre/Downloads/env.sqlite", layer="env")
+
+env_sf<-env_sf%>%mutate(light_dens = fr_gmean/shape_area)
+
+#Tulare agricultural data
+tul_ag<-readOGR(dsn="c:/users/Andre/Downloads/Tulare/tulag.sqlite", layer="tulag")
+
+sjv_pt<-readOGR(dsn="c:/users/Andre/Downloads/sjv_pt.sqlite", layer="sjv_pt")
+
+#Tular road data
+tul_roads<-readOGR(dsn="c:/users/Andre/Downloads/Tulare/tul_roads2.sqlite", layer="tul_roads2")
+
+tul_r<-readOGR(dsn="c:/users/Andre/Downloads/Tulare/tul_r.sqlite", layer="tul_r")
+
+tul_env<-readOGR(dsn="c:/users/Andre/Downloads/Tulare/tulenv.sqlite", layer="tulenv")
+
+tul_traffic<-readOGR(dsn="c:/users/Andre/Downloads/Tulare/tul_traffic.sqlite", layer="tul_traffic")
+
+tul_sjv<-readOGR(dsn="c:/users/Andre/Downloads/Tulare/tulsjv2.sqlite", layer="tulsjv2")
+
+tul_swis<-readOGR(dsn="c:/users/Andre/Downloads/Tulare/tul_swis2.sqlite", layer="tul_swis2")
+
+ca_roads<-readOGR(dsn="c:/users/Andre/Downloads/ca_roads.sqlite", layer="ca_roads")
+
+tul_st<-readOGR(dsn="c:/users/Andre/Downloads/Tulare/tul_st.sqlite", layer="tul_st")
+
+nightlight<-readOGR(dsn="c:/users/Andre/Downloads/narrow_nighlight.sqlite", layer="narrow_nighlight")
+
+nightlight_csv<-as(nightlight, "sf")
+
+tul_sjv_WGS84 <- spTransform(tul_sjv,CRS(("+proj=robin +datum=WGS84")))
+
+sjv_WGS84 <- spTransform(sjv,CRS(("+proj=robin +datum=WGS84")))
+
+ca_roads_WGS84 <- spTransform(ca_roads,CRS(("+proj=robin +datum=WGS84")))
+
+sjv_pt_WGS84 <- spTransform(sjv_pt,CRS(("+proj=robin +datum=WGS84")))
+
+plot(density(nightlight_csv$value))
+
+tul_roads_WGS84 <- spTransform(tul_roads,CRS(("+proj=robin +datum=WGS84")))
+
+tul_swis_WGS84 <- spTransform(tul_swis,CRS(("+proj=robin +datum=WGS84")))
+
+tul_st_WGS84 <- spTransform(tul_st,CRS(("+proj=robin +datum=WGS84")))
+
+scatter.smooth(x=nightlight_csv$pop2010, y=nightlight_csv$value, main="Dist ~ Speed")
+
+linearMod <- lm(pop2010 ~ value, data=nightlight_csv) 
+
+night<-nightlight_csv%>%mutate(pop = as.numeric(pop2010))
+
+linearMod <- lm(pop ~ value, data=night)
+summary(linearMod)
+
+x=seq(0, 1, length=260)
+
+plot(density(nightlight_csv$value))
+plot(dbeta(x, 10, 2), type="l", col=2)
+
+install.packages("fitdistrplus")
+library(fitdistrplus)
+
+fw <- fitdist(nightlight_csv$value, "gamma")
+summary(fw)
+
+plot(fw)
+
+y<-dgamma(x, 106.9888323,0.4448132, scale = 1/.4448132, log = FALSE)
+plot(38058105*y, type="l")
+
+fg <- fitdist(filtered$value, "gamma")
+fln <- fitdist(filtered$value, "lnorm")
+summary(fln)
+par(mfrow = c(2, 2))
+plot.legend <- c("Weibull", "lognormal", "gamma")
+4
+denscomp(list(fw, fln, fg), legendtext = plot.legend)
+qqcomp(list(fw, fln, fg), legendtext = plot.legend)
+cdfcomp(list(fw, fln, fg), legendtext = plot.legend)
+ppcomp(list(fw, fln, fg), legendtext = plot.legend)
+
+sum(env$pop2010)
+
+
+(ftoxo.P <- fitdist(filtered$value, "fisher"))
+
+summary(ftoxo.P)
+
+gofstat(list(ftoxo.P),
++ fitnames = c("Poisson" ))
+hist(filtered$
+       value, breaks=300)
+
+plot(density(filtered$value))
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+tul<-as(tul_sjv_WGS84,'sf')
+
+ggplot(tul_env) + 
+  aes(long,lat,group=group) + 
+  geom_polygon() +
+  geom_path(color="white") +
+  geom_point(data = tul, aes(x = longitude, y = latitude),col="red", size=5)
+  
+
+ggplot( aes(long,lat,group=group) ,data=tul_env)+geom_polygon()+geom_point(aes(x = longitude, y = latitude),data=tul,col="red", size=5)
+  
+  #stat_density_2d(aes(longitude, latitude, colour=population, data=tul), geom = "polygon", colour="white")
+
+
+
+
+plot(tul_env, xlim = c(-118, -120), ylim = c(35, 37), asp = 1)+plot(tul_ag)
+
+plot(tul_env, col='light gray', border='gray')
+plot(tul_ag, add=TRUE, density=20, lwd=2, col='red')
+plot(tul_roads, add=TRUE, density=20, lwd=2, col='red')
+plot(tul_traffic, add=TRUE, density=20, lwd=2, col='blue')
+plot(tul_sjv, add=TRUE, density=20, lwd=2, col='green')
+plot(gDistance(tul_sjv_WGS84, tul_roads_WGS84, byid=TRUE), add=TRUE, density=20, lwd=2, col='green')
+
+d <- density(tul$population)
+
+ggplot() + 
+  geom_polygon(aes(long,lat,group=group), data=tul_env, fill="lightsteelblue3", color="dark gray" ) +
+  geom_path(aes(long,lat,group=group), color="white", data=tul_env) +
+  geom_point(aes(x = longitude, y = latitude, size=population), data = tul, col="black")+
+  
+
+
+gg<-ggplot() + 
+  geom_polygon(aes(long,lat,group=group), data=tul_env, color="dark gray" ) +
+  geom_path(aes(long,lat,group=group), color="white", data=tul_env)
+
+gg
+
+gg+stat_density2d(data=tul, show.legend=F, aes(x=longitude, y=latitude, fill=..level.., alpha=..level..), geom="polygon", size=2, bins=15)+ scale_fill_gradient(low="gray99", high="firebrick1", name="Distribution")
+
+tul_traf<-as(tul_traffic, "sf")
+
+gg+###stat_density2d(data=tul, show.legend=F, aes(x=longitude, y=latitude,fill = stat(nlevel), fill=..level.., alpha=..level..), geom="polygon", size=2, bins=15)+
+  #scale_fill_viridis_c()+
+  geom_point(aes(x = longitude, y = latitude, size=ahead.peak.hour), data = tul_traf, col="black", alpha=0.1)+
+  geom_point(aes(x = longitude, y = latitude, size=population), data = tul, col="red", alpha=0.1)
+
+tract_comb3<-tract_comb3%>%mutate(pred_pop = fun(light_dens))
+```
+
+
+
+
+
+```{r}
+library(rgeos)
+library(rgdal)
+install.packages("leaflet")
+library(leaflet)
+install.packages("magrittr")
+library(magrittr)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+install.packages("stplanr")
+library(stplanr)
+
+rnet_buff_100 <- buff_geo(tul_r, width = 100)
+plot(tul_r)
+
+
+
+data_dir <- system.file("extdata", package = "stplanr")
+unzip(file.path(data_dir, 'smallsa1.zip'))
+unzip(file.path(data_dir, 'testcycleway.zip'))
+sa1income <- as(sf::read_sf("smallsa1.shp"), "Spatial")
+testcycleway <- as(sf::read_sf("testcycleway.shp"), "Spatial")
+# Remove unzipped files
+file.remove(list.files(pattern = "^(smallsa1|testcycleway).*"))
+
+
+catch800m <- calc_catchment(
+  polygonlayer = sa1income,
+  targetlayer = testcycleway,
+  calccols = c('Total'),
+  distance = 800,
+  projection = 'austalbers',
+  dissolve = TRUE
+)
+
+
+```
+
+
+
+```{r}
+ca_roads2_WGS84<-as(ca_roads_WGS84, "SpatialLines")
+
+tul_roads2_WGS84<-as(tul_roads_WGS84, "SpatialLines")
+
+tul_sjv2_WGS84<-as(tul_sjv_WGS84, "SpatialPoints")
+
+sjv_pt2_WGS84<-as(sjv_pt_WGS84, "SpatialPoints")
+
+tul_sjv2<-as(tul_sjv_WGS84, "sf")
+
+plot(tul_roads2_WGS84, xlab = "Longitude", ylab = "Latitude", main = "SpatialPoints + SpatialLines")
+plot(tul_sjv2_WGS84, add = TRUE, xlab = "Longitude", ylab = "Latitude", main = "SpatialPoints + SpatialLines")
+
+m <- gDistance(tul_sjv2_WGS84, tul_roads2_WGS84, byid=TRUE)
+
+n <- gDistance(tul_sjv2_WGS84, tul_swis_WGS84, byid=TRUE)
+
+       ## Finds single closest
+
+tul_sjv2<-tul_sjv2 %>%mutate(road_distance = apply(m, 2, function(X)rownames(m)[order(X)[1]]))
+
+rownames(m)[order(X)][1:10] ## Finds 10 closest
+p<-apply(road_dist, 2, function(X)rownames(m)[order(X)[1]])
+
+sjv2<-sjv %>%mutate(road_distance = apply(road_dist, 2, function(X)rownames(n)[order(X)[1]]))
+
+tul_csv<-as(tul_env, "sf")
+
+tul_ag2<-as(tul_ag, "sf")
+
+
+#FOR ALL OF CA, NOT JUST TULARE.
+road_dist<- gDistance(sjv_pt2_WGS84, ca_roads2_WGS84, byid=TRUE)
+
+
+rownames(road_dist)[order(X)][1:10] ## Finds 10 closest
+p<-apply(road_dist, 2, function(X)rownames(road_dist)[order(X)[1]])
+
+sjv2<-as(sjv_pt_WGS84, "sf")
+
+sjv2<-sjv2 %>%mutate(road_distance = apply(road_dist, 2, function(X)rownames(road_dist)[order(X)[1]]))
+
+env6<-as(env3, "Spatial")
+
+ggplot() + 
+  geom_polygon(aes(long,lat,group=group), data=env6, fill="lightsteelblue3", color="dark gray" ) +
+  geom_path(aes(long,lat,group=group), color="white", data=tul_env) +
+  geom_point(aes(x = longitude, y = latitude, size=road_distance), data = tul_sjv2, col="black", alpha=0.1) +
+  geom_path(aes(long,lat,group=group), color="red", data=tul_roads)
+```
+
+
+
+
+
+```{r}
+
+ggplot() + 
+  geom_polygon(aes(long,lat,group=group), data=tul_env, fill="lightsteelblue3", color="dark gray" ) +
+  geom_path(aes(long,lat,group=group), color="white", data=tul_env) +
+  geom_point(aes(x = longitude, y = latitude, size=road_distance), data = tul_sjv2, col="black", alpha=0.1) +
+  geom_path(aes(long,lat,group=group), color="red", data=tul_roads)
+  
+
+gg<-ggplot() + 
+  geom_polygon(aes(long,lat,group=group), data=tul_roads,  color="dark gray" ) +
+  geom_path(aes(long,lat,group=group), color="white", data=tul_env, )
+
+gg
+
+gg+stat_density2d(data=tul, show.legend=F, aes(x=longitude, y=latitude, fill=..level.., alpha=..level..), geom="polygon", size=2, bins=15)+ scale_fill_gradient(low="gray99", high="firebrick1", name="Distribution")
+
+tul_sjv3<-as(tul_sjv2, "Spatial")
+merged<-over( tul_sjv3 , tul_env , fn = NULL) 
+
+
+```
+
+
+
+
+
