@@ -2,11 +2,16 @@
 title: "Exploration"
 output: html_document
 ---
-
+The purpose of this markown file is to update and create a lot of the datasets in the environment in r studio to be used in the other files. (is relevant for mcda, density, and random forests).
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-
+library(rgeos)
+library(rgdal)
+install.packages("leaflet")
+library(leaflet)
+install.packages("magrittr")
+library(magrittr)
 library(raster)
 library(spatstat)
 library(rgdal)
@@ -33,17 +38,6 @@ library(spdplyr)
 ```
 
 
-
-```{r cars}
-CRS(tul_sjv)
-gas_WGS84 <- spTransform(gas_lines,
-                                CRS(("+proj=robin +datum=WGS84")))
-
-tul_roads_WGS84 <- spTransform(tul_roads,
-                                CRS(("+proj=robin +datum=WGS84")))
-
-
-```
 
 
 ```{r}
@@ -77,11 +71,12 @@ gas_WGS842 <- spTransform(gas_lines,
 gas_NAD83 <- spTransform(gas_lines,
                                 CRS(("+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")))
 
-#agriculture layer
+#LOADING some other layers
 cal_ag<-readOGR(dsn="c:/users/Andre/Downloads/cal_ag.sqlite", layer="cal_ag")
 
 cal_urb<-readOGR(dsn="c:/users/Andre/Downloads/urban_tracts.sqlite", layer="urban_tracts")
 
+#here is a good example of converting data frame types
 cal_ag2<-as(cal_ag, "sf")
 
 cal_urb2<-as(cal_urb,"sf")
@@ -94,7 +89,7 @@ cal_ag4<-as.data.frame(cal_ag3)
 cal_ag3<-cal_ag2%>%group_by(tract)%>%summarize(ag_area = sum(shape_area))
 
 
-merged<-cal_ag4%>%full_join(cal_urb4, by=c("tract"))%>%mutate(ag_area = replace(ag_area, is.na(ag_area), 0), urb_area=replace(urb_area, is.na(urb_area),0))
+cal_merged<-cal_ag4%>%full_join(cal_urb4, by=c("tract"))%>%mutate(ag_area = replace(ag_area, is.na(ag_area), 0), urb_area=replace(urb_area, is.na(urb_area),0))
 
 merged2<-merged%>%full_join(env_sf, by=c("tract"))
 
@@ -105,10 +100,7 @@ env_sf2<-merged%>%full_join(as.data.frame(env_sf2), by = c("tract"))
 
 
 
-
-
-
-
+#more projections etc
 tract_WGS84 <- spTransform(tract_cent,
               CRS(("+proj=robin+datum=WGS84")))
 
@@ -155,20 +147,13 @@ tract_comb<-as.data.frame(tracts)%>%distinct(id,.keep_all = TRUE)%>%full_join(me
 
 write.csv(tract_comb, file = "c:/users/Andre/Downloads/tract_comb.csv")
 
-
-tract_comp <-tract_comp%>%subset(tract_comp, select=which(!duplicated(names(.)))) 
-
-View(agriculture)
 ```
 
 
 
 
 
-
-## Including Plots
-
-You can also embed plots, for example:
+Here are examples of doing these things with just Tulare County
 
 ```{r pressure, echo=FALSE}
 file.exists('c:/users/Andre/Downloads/Tulare/tulag.sqlite')
@@ -204,6 +189,13 @@ nightlight<-readOGR(dsn="c:/users/Andre/Downloads/narrow_nighlight.sqlite", laye
 
 nightlight_csv<-as(nightlight, "sf")
 
+CRS(tul_sjv)
+gas_WGS84 <- spTransform(gas_lines,
+                                CRS(("+proj=robin +datum=WGS84")))
+
+tul_roads_WGS84 <- spTransform(tul_roads,
+                                CRS(("+proj=robin +datum=WGS84")))
+
 tul_sjv_WGS84 <- spTransform(tul_sjv,CRS(("+proj=robin +datum=WGS84")))
 
 sjv_WGS84 <- spTransform(sjv,CRS(("+proj=robin +datum=WGS84")))
@@ -220,58 +212,10 @@ tul_swis_WGS84 <- spTransform(tul_swis,CRS(("+proj=robin +datum=WGS84")))
 
 tul_st_WGS84 <- spTransform(tul_st,CRS(("+proj=robin +datum=WGS84")))
 
-scatter.smooth(x=nightlight_csv$pop2010, y=nightlight_csv$value, main="Dist ~ Speed")
 
-linearMod <- lm(pop2010 ~ value, data=nightlight_csv) 
-
-night<-nightlight_csv%>%mutate(pop = as.numeric(pop2010))
-
-linearMod <- lm(pop ~ value, data=night)
-summary(linearMod)
-
-x=seq(0, 1, length=260)
-
-plot(density(nightlight_csv$value))
-plot(dbeta(x, 10, 2), type="l", col=2)
-
-install.packages("fitdistrplus")
-library(fitdistrplus)
-
-fw <- fitdist(nightlight_csv$value, "gamma")
-summary(fw)
-
-plot(fw)
-
-y<-dgamma(x, 106.9888323,0.4448132, scale = 1/.4448132, log = FALSE)
-plot(38058105*y, type="l")
-
-fg <- fitdist(filtered$value, "gamma")
-fln <- fitdist(filtered$value, "lnorm")
-summary(fln)
-par(mfrow = c(2, 2))
-plot.legend <- c("Weibull", "lognormal", "gamma")
-4
-denscomp(list(fw, fln, fg), legendtext = plot.legend)
-qqcomp(list(fw, fln, fg), legendtext = plot.legend)
-cdfcomp(list(fw, fln, fg), legendtext = plot.legend)
-ppcomp(list(fw, fln, fg), legendtext = plot.legend)
-
-sum(env$pop2010)
-
-
-(ftoxo.P <- fitdist(filtered$value, "fisher"))
-
-summary(ftoxo.P)
-
-gofstat(list(ftoxo.P),
-+ fitnames = c("Poisson" ))
-hist(filtered$
-       value, breaks=300)
-
-plot(density(filtered$value))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Here are some plots of just Tulare County based on all the files we imported and manipulated in the previous frame. You can plot geospatial information usng the ggplot package!! It might be easier sometimes to just export files and do the plotting in QGIS, but it's nice to know that there is functionality here as well.
 ```{r}
 tul<-as(tul_sjv_WGS84,'sf')
 
@@ -330,59 +274,12 @@ tract_comb3<-tract_comb3%>%mutate(pred_pop = fun(light_dens))
 
 
 ```{r}
-library(rgeos)
-library(rgdal)
-install.packages("leaflet")
-library(leaflet)
-install.packages("magrittr")
-library(magrittr)
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-```{r}
-install.packages("stplanr")
-library(stplanr)
-
-rnet_buff_100 <- buff_geo(tul_r, width = 100)
-plot(tul_r)
-
-
-
-data_dir <- system.file("extdata", package = "stplanr")
-unzip(file.path(data_dir, 'smallsa1.zip'))
-unzip(file.path(data_dir, 'testcycleway.zip'))
-sa1income <- as(sf::read_sf("smallsa1.shp"), "Spatial")
-testcycleway <- as(sf::read_sf("testcycleway.shp"), "Spatial")
-# Remove unzipped files
-file.remove(list.files(pattern = "^(smallsa1|testcycleway).*"))
-
-
-catch800m <- calc_catchment(
-  polygonlayer = sa1income,
-  targetlayer = testcycleway,
-  calccols = c('Total'),
-  distance = 800,
-  projection = 'austalbers',
-  dissolve = TRUE
-)
-
 
 ```
 
 
 
+Practicing distance calculations using just tulare county. 
 ```{r}
 ca_roads2_WGS84<-as(ca_roads_WGS84, "SpatialLines")
 
@@ -401,7 +298,7 @@ m <- gDistance(tul_sjv2_WGS84, tul_roads2_WGS84, byid=TRUE)
 
 n <- gDistance(tul_sjv2_WGS84, tul_swis_WGS84, byid=TRUE)
 
-       ## Finds single closest
+## Finds single closest in
 
 tul_sjv2<-tul_sjv2 %>%mutate(road_distance = apply(m, 2, function(X)rownames(m)[order(X)[1]]))
 
