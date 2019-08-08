@@ -7,6 +7,7 @@ the random_forest code contains a short code that runs an RF algorithm using a d
 
 The density code looks at modeling population density based on light density in different tracts. the tract_comb comes from turning env_state into a "Sf" and subsequently a data.frame and it contains useful values such as light mean for a given area. combined with shape area you can look at density there.
 
-the mcda file covers the smart and k means clustering techniques. it is important to impute the data as shown so that you can run the k means clustering algorithm.
+The mcda file covers the smart and k means clustering techniques. it is important to impute the data as shown so that you can run the k means clustering algorithm.
 
+Regardless of whether or not all file names are updated, variable names can be explored in other files and run using any code for plots/algorithms/etc.
 
