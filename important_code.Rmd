@@ -58,10 +58,21 @@ agr_sf2<-agr_sf%>%group_by(tract)%>%summarize(area = sum(acres))
 #adding agricultural area to the environmental data
 env%>%full_join(agr_sf2,by=c("tract"))
 
+write.csv(tract_comb,"c:/users/Andre/Downloads/yehupetz.csv")
 
 
-#gaslines
-gas_lines<-readOGR(dsn="c:/users/Andre/Downloads/gaslines.sqlite", layer="gaslines")
+
+read.csv("c:/users/Andre/Downloads/yehupetz.csv")
+env_state
+
+#here we can make the tract_comb file from the env_stat later in QGIS. saving the file as a spatial frame and then you can convert it into a data frame.
+env_stat<-readOGR(dsn="c:/users/Andre/Downloads/env_stat.sqlite", layer="env_stat")
+
+
+#this is the tract_comb origin, so where it is referenced, here is how it was created
+tract_com<-as(env_stat, "sf")
+
+
 
 #projecting gaslines
 gas_WGS842 <- spTransform(gas_lines,
