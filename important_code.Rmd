@@ -131,11 +131,6 @@ roads_WGS84 <-spTransform(ca_roads,CRS(("+proj=robin +datum=WGS84")))
 
 
 #EUCLIDEAN DISTANCE CALCULATIONS
-d <- gDistance(roads_WGS84, tract_WGS84, byid=TRUE)
-
-d2 <- gDistance(trans_WGS84, tract_WGS84, byid=TRUE)
-
-d3 <- gDistance(gas_WGS84, tract_WGS84, byid=TRUE)
 
 p3 <- gDistance(gas_NAD83,tract_NAD83,  byid=TRUE)
 
@@ -144,13 +139,13 @@ p2 <- gDistance(trans_NAD83,tract_NAD83,  byid=TRUE)
 p1 <- gDistance(roads_NAD83,tract_NAD83,  byid=TRUE)
 
 #UPDATING DATASET WITH DISTANCES INCLUDED
-tracts<-as.data.frame(tract_cent) %>%mutate(gas_distance = apply(p3, 1, FUN=min)/1000, trans_dist = apply(p2, 1, FUN=min)/1000, road_dist = apply(p1, 1, FUN=min)/1000)
+tracts<-as.data.frame(tract_cent)%>%mutate(gas_distance = apply(p3, 1, FUN=min)/1000, trans_dist = apply(p2, 1, FUN=min)/1000, road_dist = apply(p1, 1, FUN=min)/1000)
 
 #MAKE NEW COMPLETE DATASET
-tract_comb<-as.data.frame(tracts)%>%distinct(id,.keep_all = TRUE)%>%full_join(merged, by = c("tract"))
+tract_comb<-as.data.frame(tracts)%>%distinct(id,.keep_all = TRUE)%>%full_join(merged2, by = c("tract"))
 
-#write.csv(tract_comb, file = "c:/users/Andre/Downloads/tract_comb.csv")
-
+write.csv(tracts, file = "SJV/final_file_pre_merge.csv")
+write.csv(tracts, file = "SJV/final_file_post_merge.csv")
 ```
 
 
