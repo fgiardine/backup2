@@ -4,18 +4,14 @@ output: html_document
 ---
 The purpose of this markown file is to update and create a lot of the datasets in the environment in r studio to be used in the other files. (is relevant for mcda, density, and random forests).
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+
 
 library(rgeos)
 library(rgdal)
-install.packages("leaflet")
 library(leaflet)
-install.packages("magrittr")
 library(magrittr)
 library(raster)
 library(spatstat)
-library(rgdal)
-library(rgeos)
 library(sf)
 library(ggplot2)
 library(ggmap)
@@ -23,8 +19,6 @@ library(dplyr)
 library(maptools)
 library(proj4)
 library(ggrepel)
-library(sp)
-library(dplyr)
 library(data.table)
 library(tidyverse)
 library(lubridate)
@@ -42,35 +36,61 @@ library(spdplyr)
 
 ```{r}
 #this file contains all of the tract centroids
-tract_cent<-readOGR(dsn="c:/users/Andre/Downloads/tract_centroid.sqlite", layer="tract_centroid")
+tract_cent<-readOGR(dsn="SJV/tract_centroid.sqlite", layer="tract_centroid")
+
+env_2<-readOGR(dsn="SJV/env_2.sqlite", layer="env_2")
 
 #transmission lines
-trans_lines<-readOGR(dsn="c:/users/Andre/Downloads/trans_lines.sqlite", layer="trans_lines")
+trans_lines<-readOGR(dsn="SJV/trans_lines.sqlite", layer="trans_lines")
+
+gas_lines<-readOGR(dsn="SJV/gaslines.sqlite", layer="gaslines")
 
 #agriculture
-agr<-readOGR(dsn="c:/users/Andre/Downloads/cal_ag.sqlite", layer="cal_ag")
+agr<-readOGR(dsn="SJV/cal_ag.sqlite", layer="cal_ag")
 
 agr_sf<-as(agr, "sf")
 
 #summarizing acres of agriculture
-agr_sf2<-agr_sf%>%group_by(tract)%>%summarize(area = sum(acres))
+agr_sf2<-agr_sf%>%group_by(tract)%>%summarize(ag_area = sum(acres))
 
 #adding agricultural area to the environmental data
-env%>%full_join(agr_sf2,by=c("tract"))
+env_sf<-as(env_2, "sf")
+env_sf%>%st_join(agr_sf2,by=c("tract"))
 
-write.csv(tract_comb,"c:/users/Andre/Downloads/yehupetz.csv")
-
-
-
-read.csv("c:/users/Andre/Downloads/yehupetz.csv")
-env_state
 
 #here we can make the tract_comb file from the env_stat later in QGIS. saving the file as a spatial frame and then you can convert it into a data frame.
-env_stat<-readOGR(dsn="c:/users/Andre/Downloads/env_stat.sqlite", layer="env_stat")
+env_stat<-readOGR(dsn="SJV/env_stat.sqlite", layer="env_stat")
 
 
 #this is the tract_comb origin, so where it is referenced, here is how it was created
-tract_com<-as(env_stat, "sf")
+tract_comb<-as(env_stat, "sf")
+
+
+
+
+
+cal_urb<-readOGR(dsn="SJV/urban_tracts.sqlite", layer="urban_tracts")
+
+#here is a good example of converting data frame types
+
+
+cal_urb2<-as(cal_urb,"sf")
+
+cal_urb3<-cal_urb2%>%group_by(tract)%>%summarize(urb_area = sum(acres))
+
+cal_urb4<- as.data.frame(cal_urb3)
+
+
+
+
+cal_ag4<-as.data.frame(agr_sf2)
+
+
+cal_merged<-cal_ag4%>%full_join(cal_urb4, by=c("tract"))%>%mutate(ag_area = replace(ag_area, is.na(ag_area), 0), urb_area=replace(urb_area, is.na(urb_area),0))
+
+merged2<-cal_merged%>%full_join(env_sf, by=c("tract"))
+
+env_sf2<-merged2%>%full_join(as.data.frame(env_sf), by = c("tract"))
 
 
 
@@ -82,50 +102,23 @@ gas_WGS842 <- spTransform(gas_lines,
 gas_NAD83 <- spTransform(gas_lines,
                                 CRS(("+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")))
 
-#LOADING some other layers
-cal_ag<-readOGR(dsn="c:/users/Andre/Downloads/cal_ag.sqlite", layer="cal_ag")
-
-cal_urb<-readOGR(dsn="c:/users/Andre/Downloads/urban_tracts.sqlite", layer="urban_tracts")
-
-#here is a good example of converting data frame types
-cal_ag2<-as(cal_ag, "sf")
-
-cal_urb2<-as(cal_urb,"sf")
-
-cal_urb3<-cal_urb2%>%group_by(tract)%>%summarize(urb_area = sum(area()))
-
-cal_urb4<- as.data.frame(cal_urb3)
-
-cal_ag4<-as.data.frame(cal_ag3)
-cal_ag3<-cal_ag2%>%group_by(tract)%>%summarize(ag_area = sum(shape_area))
-
-
-cal_merged<-cal_ag4%>%full_join(cal_urb4, by=c("tract"))%>%mutate(ag_area = replace(ag_area, is.na(ag_area), 0), urb_area=replace(urb_area, is.na(urb_area),0))
-
-merged2<-merged%>%full_join(env_sf, by=c("tract"))
-
-env_sf2<-merged%>%full_join(as.data.frame(env_sf2), by = c("tract"))
-
-
-
-
-
 
 #more projections etc
 tract_WGS84 <- spTransform(tract_cent,
-              CRS(("+proj=robin+datum=WGS84")))
+              CRS(("+proj=robin +datum=WGS84")))
 
 trans_WGS84 <- spTransform(trans_lines,
-              CRS(("+proj=robin+datum=WGS84")))
+              CRS(("+proj=robin +datum=WGS84")))
 
 gas_WGS84 <- spTransform(gas_lines,
-              CRS(("+proj=robin+datum=WGS84")))
+              CRS(("+proj=robin +datum=WGS84")))
+
 
 tract_NAD83 <- spTransform(tract_cent,
                                 CRS(("+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")))
 
 
-ca_roads<-readOGR(dsn="c:/users/Andre/Downloads/ca_roads.sqlite", layer="ca_roads")
+ca_roads<-readOGR(dsn="SJV/ca_roads.sqlite", layer="ca_roads")
 
 roads_NAD83 <- spTransform(ca_roads,
                                 CRS(("+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")))
@@ -156,7 +149,7 @@ tracts<-as.data.frame(tract_cent) %>%mutate(gas_distance = apply(p3, 1, FUN=min)
 #MAKE NEW COMPLETE DATASET
 tract_comb<-as.data.frame(tracts)%>%distinct(id,.keep_all = TRUE)%>%full_join(merged, by = c("tract"))
 
-write.csv(tract_comb, file = "c:/users/Andre/Downloads/tract_comb.csv")
+#write.csv(tract_comb, file = "c:/users/Andre/Downloads/tract_comb.csv")
 
 ```
 
